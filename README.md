@@ -1,3 +1,13 @@
+# ALVR Web Client
+
+This repository is a fork of [ALVR](https://github.com/alvr-org/ALVR), with the extenstion to provide a web application for streaming video and audio from SteamVR-compatible PC VR applications to a laptop PC or Android device. You can remotely control SteamVR-compatible PC VR applications using XR Glasses and a DualSense controller. The QUIC (HTTP/3) protocol enables low-latency communication, even over mobile networks.
+
+For detail, please find [English](ALVR_WEBCLIENT_en.md) or [日本語](ALVR_WEBCLIENT_jp.md) document.
+
+<br>
+
+---
+
 <p align="center"> <img width="500" src="resources/ALVR-Grey.svg"/> </p>
 
 # ALVR - Air Light VR
