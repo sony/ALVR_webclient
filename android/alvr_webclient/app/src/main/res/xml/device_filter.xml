@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    USB device filter for supported XR glasses.
+
+    Must be kept in sync with XrGlassesDevice.java.
+    Decimal values: vendor-id and product-id are specified in decimal.
+
+    XREAL Air 2 / Air 2 Pro / Air 2 Ultra
+      VID: 0x3318 = 13080
+      PID: 0x0424 = 1060   Air 2
+      PID: 0x0426 = 1062   Air 2 Ultra
+      PID: 0x0428 = 1064   Air 2 Pro
+      PID: 0x0432 = 1074   Air 2 Ultra
+      PID: 0x0436 = 1078   Air 2 Ultra (alt firmware)
+
+    VITURE One
+      VID: 0x35CA = 13770
+      PID: 0x1011 = 4113
+
+    VITURE Pro
+      VID: 0x35CA = 13770
+      PID: 0x101D = 4125
+
+    VITURE Pro 2
+      VID: 0x35CA = 13770
+      PID: 0x1301 = 4865
+
+    RayNeo Air 3s Pro / Air 4 Pro
+      VID: 0x1BBB = 7099
+      PID: 0xAF50 = 44880
+-->
+<resources>
+    <!-- XREAL Air 2 (VID=0x3318 PID=0x0424) -->
+    <usb-device vendor-id="13080" product-id="1060" />
+    <!-- XREAL Air 2 Ultra (VID=0x3318 PID=0x0426) -->
+    <usb-device vendor-id="13080" product-id="1062" />
+    <!-- XREAL Air 2 Pro (VID=0x3318 PID=0x0428) -->
+    <usb-device vendor-id="13080" product-id="1064" />
+    <!-- XREAL Air 2 Ultra (VID=0x3318 PID=0x0432) -->
+    <usb-device vendor-id="13080" product-id="1074" />
+    <!-- XREAL Air 2 Ultra alt firmware (VID=0x3318 PID=0x0436) -->
+    <usb-device vendor-id="13080" product-id="1078" />
+    <!-- VITURE One (VID=0x35CA PID=0x1011) -->
+    <usb-device vendor-id="13770" product-id="4113" />
+    <!-- VITURE Pro (VID=0x35CA PID=0x101D) -->
+    <usb-device vendor-id="13770" product-id="4125" />
+    <!-- VITURE Pro 2 (VID=0x35CA PID=0x1301) -->
+    <usb-device vendor-id="13770" product-id="4865" />
+    <!-- RayNeo Air 3s Pro / Air 4 Pro (VID=0x1BBB PID=0xAF50) -->
+    <usb-device vendor-id="7099" product-id="44880" />
+</resources>

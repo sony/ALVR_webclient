@@ -1,0 +1,63 @@
+plugins {
+    id 'com.android.application'
+}
+
+// ---------------------------------------------------------------------------
+// Sync web client assets from the ALVR server directory before each build.
+// Source: webclient/ (contains client.js, audio-processor.js, …)
+// Dest:   app/src/main/assets/web_client/
+// ---------------------------------------------------------------------------
+preBuild.doFirst {
+    def srcDir = file("${rootProject.projectDir}/../../webclient")
+    def dstDir = file("${projectDir}/src/main/assets/web_client")
+    if (!srcDir.exists()) {
+        logger.warn("[alvr] Web client source not found at ${srcDir} – skipping asset sync")
+        return
+    }
+    dstDir.mkdirs()
+    copy {
+        from srcDir
+        into dstDir
+    }
+    logger.lifecycle("[alvr] Synced web client assets: ${srcDir} → ${dstDir}")
+}
+
+android {
+    namespace 'com.alvr.webclient'
+    compileSdk 37
+
+    defaultConfig {
+        applicationId "com.alvr.webclient"
+        minSdk 31           // Android 12+ – guarantees WebCodecs support
+        targetSdk 37
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        viewBinding true
+    }
+}
+
+dependencies {
+    // Gson for JSON serialisation (IMU packets)
+    implementation 'com.google.code.gson:gson:2.10.1'
+    // AndroidX
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    // WebView utilities
+    implementation 'androidx.webkit:webkit:1.12.1'
+}
