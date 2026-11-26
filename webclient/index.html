@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALVR Web Client</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>ALVR Web Client</h1>
+      <span id="status-badge" class="badge disconnected">Disconnected</span>
+    </header>
+
+    <!-- Connection panel (shown before connecting) -->
+    <section id="connect-panel">
+      <p>Connect to the ALVR server to start streaming VR to your XR glasses.</p>
+      <div class="field-row">
+        <label for="server-host">Server address</label>
+        <input id="server-host" type="text" value="localhost" />
+      </div>
+      <div class="field-row">
+        <label for="server-port">Port</label>
+        <input id="server-port" type="number" value="8083" min="1" max="65535" />
+      </div>
+      <button id="btn-connect" class="primary">Connect</button>
+    </section>
+
+    <!-- Stream panel (shown after connecting) -->
+    <section id="stream-panel" hidden>
+      <div id="codec-info" class="info-row"></div>
+      <div id="imu-mode"   class="info-row">IMU: –</div>
+      <div id="ds-status"  class="info-row">DualSense: –</div>
+      <div id="ds-pose"    class="info-row">Pose: –</div>
+
+      <div class="button-row">
+        <button id="btn-present" class="primary">
+          Stream to XR Glasses
+        </button>
+        <!-- Shown only on Windows Chrome (WebHID available) -->
+        <button id="btn-hid-connect" class="secondary" hidden>
+          Connect XR Glasses
+        </button>
+        <button id="btn-ds-connect" class="secondary" hidden>
+          Connect DualSense
+        </button>
+        <button id="btn-disconnect" class="secondary">Disconnect</button>
+      </div>
+
+
+    </section>
+    <div id="video-error" class="info-row" role="alert" hidden></div>
+  </div>
+
+  <!-- Local preview canvas (small, for debugging) -->
+  <canvas id="preview-canvas" width="320" height="180"></canvas>
+
+  <script type="module" src="client.js"></script>
+  <script>
+    // Pre-fill the server address from the page host so users on other
+    // machines (e.g. Laptop PC accessing https://192.168.1.23:8083/) see
+    // the correct IP instead of the hardcoded "localhost" default.
+    document.addEventListener('DOMContentLoaded', () => {
+      const hostInput = document.getElementById('server-host');
+      if (hostInput && window.location.hostname) {
+        hostInput.value = window.location.hostname;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALVR Receiver</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #000;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      object-fit: contain;
+    }
+    #overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      align-items: center;
+      color: #fff;
+      font-family: sans-serif;
+      font-size: 1.4rem;
+      background: #000;
+      z-index: 10;
+    }
+    .overlay-message {
+      justify-self: center;
+    }
+    #overlay.hidden { display: none; }
+    .controller-indicator {
+      position: fixed;
+      top: 1.5vh;
+      width: 1.25vw;
+      height: 1.25vw;
+      opacity: 0.85;
+      z-index: 20;
+      display: none;
+      pointer-events: none;
+    }
+    #indicator-left {
+      left: 25%;
+      transform: translateX(-50%);
+    }
+    #indicator-right {
+      left: 75%;
+      transform: translateX(-50%);
+    }
+    .controller-indicator.visible {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="overlay">
+    <span class="overlay-message">Waiting for video stream…</span>
+    <span class="overlay-message">Waiting for video stream…</span>
+  </div>
+  <canvas id="render-canvas"></canvas>
+  <img id="indicator-left"  class="controller-indicator" src="" alt="" />
+  <img id="indicator-right" class="controller-indicator" src="" alt="" />
+  <script type="module" src="receiver.js"></script>
+</body>
+</html>

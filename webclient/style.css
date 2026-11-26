@@ -1,0 +1,163 @@
+/* ALVR Web Client – main stylesheet */
+
+:root {
+  --color-bg:      #1a1a2e;
+  --color-surface: #16213e;
+  --color-accent:  #0f3460;
+  --color-primary: #e94560;
+  --color-text:    #e0e0e0;
+  --color-muted:   #888;
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+#app {
+  width: 100%;
+  max-width: 480px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+/* ── Status badge ── */
+.badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge.disconnected { background: #555; color: #ccc; }
+.badge.connecting   { background: #f0a500; color: #000; }
+.badge.connected    { background: #27ae60; color: #fff; }
+.badge.error        { background: #c0392b; color: #fff; }
+
+/* ── Panels ── */
+section {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+section p {
+  color: var(--color-muted);
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+/* ── Form fields ── */
+.field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+label {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+input[type="text"],
+input[type="number"] {
+  background: var(--color-accent);
+  border: 1px solid #333;
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font-size: 1rem;
+  padding: 0.5rem 0.75rem;
+  width: 100%;
+}
+
+input:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+/* ── Buttons ── */
+button {
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.6rem 1.25rem;
+  transition: opacity 0.15s;
+}
+
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+button:not(:disabled):hover { opacity: 0.85; }
+
+button.primary   { background: var(--color-primary); color: #fff; }
+button.secondary { background: #333; color: var(--color-text); }
+
+/* Full-width single buttons */
+#btn-connect { width: 100%; }
+
+/* Button group in stream panel */
+.button-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.button-row button { width: 100%; }
+
+/* ── Info rows ── */
+.info-row {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  margin-bottom: 0.5rem;
+}
+
+/* ── Hint text ── */
+.hint {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin-top: 0.75rem;
+}
+
+.hint strong {
+  color: var(--color-text);
+}
+
+/* ── Stats ── */
+#stats-panel {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  flex-wrap: wrap;
+}
+
+/* ── Preview canvas (debug only) ── */
+#preview-canvas {
+  display: none;
+}
