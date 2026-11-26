@@ -30,6 +30,10 @@ pub struct BitrateManager {
     dynamic_decoder_max_bytes_per_frame: f32,
     previous_config: Option<BitrateConfig>,
     update_needed: bool,
+    // Upper bound set by a transport-level congestion detector (Web Client).
+    congestion_cap_bps: Option<f32>,
+    // Bitrate computed from the settings before applying congestion_cap_bps.
+    last_uncapped_bitrate_bps: f32,
 }
 
 impl BitrateManager {
@@ -56,7 +60,22 @@ impl BitrateManager {
             dynamic_decoder_max_bytes_per_frame: f32::MAX,
             previous_config: None,
             update_needed: true,
+            congestion_cap_bps: None,
+            last_uncapped_bitrate_bps: 0.0,
         }
+    }
+
+    /// Limit the encoder bitrate to `cap_bps` (`None` removes the limit).
+    pub fn set_congestion_cap(&mut self, cap_bps: Option<f32>) {
+        if cap_bps != self.congestion_cap_bps {
+            self.congestion_cap_bps = cap_bps;
+            self.update_needed = true;
+        }
+    }
+
+    /// Bitrate derived from the settings, before the congestion cap (0 until first computed).
+    pub fn uncapped_bitrate_bps(&self) -> f32 {
+        self.last_uncapped_bitrate_bps
     }
 
     // Note: This is used to calculate the framerate/frame interval. The frame present is the most
@@ -190,11 +209,15 @@ impl BitrateManager {
                     packet_bytes_average * 8.0 * saturation_multiplier / network_latency_average_s;
                 bitrate_directives.scaled_calculated_throughput_bps = Some(throughput_bps);
 
-                if decoder_latency_limiter.enabled() {
-                    throughput_bps =
-                        f32::min(throughput_bps, self.dynamic_decoder_max_bytes_per_frame);
-                    bitrate_directives.decoder_latency_limiter_bps =
-                        Some(self.dynamic_decoder_max_bytes_per_frame);
+                if decoder_latency_limiter.enabled()
+                    && self.dynamic_decoder_max_bytes_per_frame < f32::MAX
+                {
+                    // dynamic_decoder_max_bytes_per_frame is bytes per frame: convert it to
+                    // bits per second before comparing it with throughput_bps.
+                    let max_bps = self.dynamic_decoder_max_bytes_per_frame * 8.0
+                        / frame_interval.as_secs_f32();
+                    throughput_bps = f32::min(throughput_bps, max_bps);
+                    bitrate_directives.decoder_latency_limiter_bps = Some(max_bps);
                 }
 
                 if let Switch::Enabled(max_ms) = max_network_latency_ms {
@@ -239,6 +262,12 @@ impl BitrateManager {
             }
         };
 
+        self.last_uncapped_bitrate_bps = bitrate_bps;
+        let bitrate_bps = match self.congestion_cap_bps {
+            Some(cap_bps) => f32::min(bitrate_bps, cap_bps),
+            None => bitrate_bps,
+        };
+
         bitrate_directives.requested_bitrate_bps = bitrate_bps;
 
         Some((
@@ -248,5 +277,79 @@ impl BitrateManager {
             },
             bitrate_directives,
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alvr_session::DecoderLatencyLimiter;
+
+    fn constant_config(mbps: u64) -> BitrateConfig {
+        BitrateConfig {
+            mode: BitrateMode::ConstantMbps(mbps),
+            adapt_to_framerate: Switch::Disabled,
+            history_size: 256,
+            image_corruption_fix: false,
+        }
+    }
+
+    #[test]
+    fn congestion_cap_limits_and_restores_constant_bitrate() {
+        let config = constant_config(30);
+        let mut manager = BitrateManager::new(256, 90.0);
+        let (params, _) = manager.get_encoder_params(&config).unwrap();
+        assert_eq!(params.bitrate_bps, 30e6);
+
+        manager.set_congestion_cap(Some(8e6));
+        let (params, _) = manager.get_encoder_params(&config).unwrap();
+        assert_eq!(params.bitrate_bps, 8e6);
+        assert_eq!(manager.uncapped_bitrate_bps(), 30e6);
+
+        // Unchanged cap: constant mode does not recompute.
+        manager.set_congestion_cap(Some(8e6));
+        assert!(manager.get_encoder_params(&config).is_none());
+
+        manager.set_congestion_cap(None);
+        let (params, _) = manager.get_encoder_params(&config).unwrap();
+        assert_eq!(params.bitrate_bps, 30e6);
+    }
+
+    #[test]
+    fn decoder_latency_limit_is_converted_to_bits_per_second() {
+        let mut config = constant_config(30);
+        config.mode = BitrateMode::Adaptive {
+            saturation_multiplier: 1.0,
+            max_throughput_mbps: Switch::Disabled,
+            min_throughput_mbps: Switch::Disabled,
+            max_network_latency_ms: Switch::Disabled,
+            encoder_latency_limiter: Switch::Disabled,
+            decoder_latency_limiter: Switch::Enabled(DecoderLatencyLimiter {
+                max_decoder_latency_ms: 30,
+                latency_overstep_frames: 1,
+                latency_overstep_multiplier: 1.0,
+            }),
+        };
+
+        let mut manager = BitrateManager::new(256, 90.0);
+        // 40 kB frames delivered with 10 ms network latency, decoder over the limit once.
+        let ts = Duration::from_millis(1);
+        manager.report_frame_encoded(ts, Duration::ZERO, 40_000);
+        manager.report_frame_latencies(
+            &config.mode,
+            ts,
+            Duration::from_millis(10),
+            Duration::from_millis(50),
+        );
+        let frame_bytes = manager.packet_bytes_average.get_average();
+        let (params, directives) = manager.get_encoder_params(&config).unwrap();
+
+        // The limiter allows the average frame size at 90 fps (tens of Mbps), not bytes/frame
+        // interpreted as bps.
+        let expected_limit_bps = frame_bytes * 8.0 * 90.0;
+        assert!(expected_limit_bps > 1e7);
+        let limit_bps = directives.decoder_latency_limiter_bps.unwrap();
+        assert!((limit_bps - expected_limit_bps).abs() / expected_limit_bps < 0.01);
+        assert!((params.bitrate_bps - limit_bps).abs() < 1.0);
     }
 }

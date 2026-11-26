@@ -1414,6 +1414,11 @@ TCP: Slower than UDP, but more stable. Pick this if you experience video or audi
 
     pub stream_port: u16,
     pub web_server_port: u16,
+    #[schema(strings(
+        display_name = "Web Client server port",
+        help = "Port for the Web-based ALVR client server (separate from the dashboard web server)."
+    ))]
+    pub web_client_port: u16,
     pub osc_local_port: u16,
 
     #[schema(strings(display_name = "Streamer send buffer size"))]
@@ -2107,6 +2112,7 @@ pub fn session_settings_default() -> SettingsDefault {
             },
             wired_client_autolaunch: true,
             web_server_port: 8082,
+            web_client_port: 8083,
             stream_port: 9944,
             osc_local_port: 9942,
             dscp: OptionalDefault {

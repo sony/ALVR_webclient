@@ -41,6 +41,8 @@ hyper = { version = "0.14", features = [
 mdns-sd = "0.13"
 profiling = { version = "1", optional = true }
 reqwest = "0.11" # not used but webserver does not work without it. todo: investigate
+rcgen = { version = "0.13", default-features = false, features = ["crypto", "pem", "ring"] }
+cpal = "0.15"
 rosc = "0.10"
 tokio = { version = "1", features = [
     "rt-multi-thread",
@@ -49,9 +51,16 @@ tokio = { version = "1", features = [
     "io-util",
     "net",
     "fs",
+    "time",
+    "sync",
 ] }
+tokio-rustls = "0.26"
 tokio-tungstenite = "0.20"
 tokio-util = { version = "0.7", features = ["codec"] }
 serde = "1"
 serde_json = "1"
 sysinfo = "0.33"
+wtransport = { version = "0.7", default-features = true, features = ["quinn"] }  # WebTransport (QUIC/HTTP3); "quinn" exposes the non-blocking QUIC finish() used for IDR streams
+sha2 = "0.10"  # SHA-256 for WebTransport certificate fingerprint
+time = "0.3"   # date arithmetic for WebTransport certificate validity
+opus = "0.3"   # Opus audio compression for the Web Client game audio / microphone streams

@@ -5,7 +5,7 @@ members = ["alvr/*"]
 [workspace.package]
 version = "20.14.1"
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.88"
 authors = ["alvr-org"]
 license = "MIT"
 
@@ -32,3 +32,6 @@ strip = false
 [profile.distribution]
 inherits = "release"
 lto = true
+
+[env]
+CMAKE_POLICY_VERSION_MINIMUM = "3.5"

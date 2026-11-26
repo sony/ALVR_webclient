@@ -9,6 +9,8 @@ mod sockets;
 mod statistics;
 mod tracking;
 mod web_server;
+pub mod web_audio;
+pub mod web_client;
 
 pub use c_api::*;
 pub use logging_backend::init_logging;
@@ -176,6 +178,8 @@ pub struct ServerCoreContext {
     connection_context: Arc<ConnectionContext>,
     connection_thread: Arc<RwLock<Option<JoinHandle<()>>>>,
     webserver_runtime: Option<Runtime>,
+    /// Shared state for the Web Client server (port 8083).
+    pub web_client_state: Arc<web_client::WebClientState>,
 }
 
 impl ServerCoreContext {
@@ -194,10 +198,63 @@ impl ServerCoreContext {
 
         SESSION_MANAGER.write().clean_client_list();
 
+        // Pre-configure openvr_config for the Web Client: per-eye 1920×1080 @ 90 Hz,
+        // side-by-side layout (total render target 3840×1080).
+        //
+        // IMPORTANT: We must start from a fully-constructed config produced by
+        // `connection::contruct_openvr_config()` so that encoder-override fields such
+        // as `nvenc_refresh_rate` are set to their "disabled" sentinel (-1) rather than
+        // the zero-value default.  If those fields stay at 0, the NVENC encoder will
+        // try to create a stream at 0 Hz and fail with NV_ENC_ERR_INVALID_PARAM.
+        {
+            let new_config = {
+                let session_read = SESSION_MANAGER.read();
+                let mut cfg = connection::contruct_openvr_config(session_read.session());
+                cfg.eye_resolution_width         = 1920;
+                cfg.eye_resolution_height        = 1080;
+                cfg.target_eye_resolution_width  = 1920;
+                cfg.target_eye_resolution_height = 1080;
+                cfg.refresh_rate                 = 90;
+                cfg.enable_foveated_encoding     = false;
+
+                // `contruct_openvr_config` leaves `use_full_range_encoding` and
+                // `encoding_gamma` at their `..old_config` values (f32/bool default = 0.0/false).
+                // For a real ALVR client these get filled in during connection_pipeline from
+                // the client's streaming_caps.  For the Web Client we must set them here
+                // from session_settings so the NVENC shader doesn't apply gamma=0
+                // (which maps all colours to black: pow(x, 1/0) → 0).
+                let enc_cfg = &session_read.session().to_settings().video.encoder_config;
+                // If the server is set to override the client's preference, honour that;
+                // otherwise fall back to the session_settings value (not a client caps value
+                // because the web client reports no caps).
+                cfg.use_full_range_encoding = if enc_cfg.server_overrides_use_full_range {
+                    enc_cfg.use_full_range
+                } else {
+                    // Web client prefers full-range (standard for web/browser video).
+                    true
+                };
+                cfg.encoding_gamma = if enc_cfg.server_overrides_encoding_gamma {
+                    enc_cfg.encoding_gamma
+                } else {
+                    // Web client uses standard sRGB gamma 1.0.
+                    1.0
+                };
+
+                cfg
+            };
+            SESSION_MANAGER.write().session_mut().openvr_config = new_config;
+        }
+
         let (events_sender, events_receiver) = mpsc::channel();
 
         // Create a temporary StatisticsManager until a headset connects
         let initial_settings = SESSION_MANAGER.read().settings().clone();
+        // The Web Client never runs connection_pipeline(), which recreates the
+        // BitrateManager with the negotiated fps.  Create it with the Web Client
+        // refresh rate configured above: with a 60 fps nominal rate, NVENC sized
+        // each frame for 60 fps while encoding at 90 fps, so the real bitrate was
+        // 1.5× the configured one (ConstantMbps 30 → ~45 Mbps).
+        let web_client_fps = SESSION_MANAGER.read().session().openvr_config.refresh_rate as f32;
         let stats = StatisticsManager::new(
             initial_settings.connection.statistics_history_size,
             Duration::from_secs_f32(1.0 / 90.0),
@@ -211,7 +268,10 @@ impl ServerCoreContext {
         let connection_context = Arc::new(ConnectionContext {
             events_sender,
             statistics_manager: RwLock::new(Some(stats)),
-            bitrate_manager: Mutex::new(BitrateManager::new(256, 60.0)),
+            bitrate_manager: Mutex::new(BitrateManager::new(
+                initial_settings.video.bitrate.history_size,
+                web_client_fps,
+            )),
             tracking_manager: RwLock::new(TrackingManager::new(
                 initial_settings.connection.statistics_history_size,
             )),
@@ -230,14 +290,26 @@ impl ServerCoreContext {
             async move { alvr_common::show_err(web_server::web_server(connection_context).await) }
         });
 
+        // Start the Web Client server (port 8083) on the same runtime.
+        let web_client_state = web_client::WebClientState::new();
+        webserver_runtime.spawn({
+            let connection_context = Arc::clone(&connection_context);
+            let state = Arc::clone(&web_client_state);
+            async move {
+                alvr_common::show_err(
+                    web_client::web_client(connection_context, state).await,
+                )
+            }
+        });
+
         (
             Self {
                 lifecycle_state: Arc::new(RwLock::new(LifecycleState::StartingUp)),
                 is_restarting: RelaxedAtomic::new(false),
                 connection_context,
-
                 connection_thread: Arc::new(RwLock::new(None)),
                 webserver_runtime: Some(webserver_runtime),
+                web_client_state,
             },
             events_receiver,
         )
@@ -356,8 +428,12 @@ impl ServerCoreContext {
 
         *self.connection_context.decoder_config.lock() = Some(DecoderInitializationConfig {
             codec,
-            config_buffer,
+            config_buffer: config_buffer.clone(),
         });
+
+        // Forward decoder config to Web Client browsers.
+        self.web_client_state
+            .set_video_config_nals(config_buffer, codec);
     }
 
     pub fn send_video_nal(&self, target_timestamp: Duration, nal_buffer: Vec<u8>, is_idr: bool) {
@@ -420,7 +496,7 @@ impl ServerCoreContext {
                             timestamp: target_timestamp,
                             is_idr
                         },
-                        payload: nal_buffer,
+                        payload: nal_buffer.clone(),
                     }),
                     Err(TrySendError::Full(_))
                 ) {
@@ -444,6 +520,10 @@ impl ServerCoreContext {
                     .report_frame_encoded(target_timestamp, encoder_latency, buffer_size);
             }
         }
+
+        // Forward NAL unit to Web Client browsers (non-blocking; drops if no subscriber).
+        self.web_client_state
+            .send_video_nal(target_timestamp, nal_buffer, is_idr);
     }
 
     pub fn get_dynamic_encoder_params(&self) -> Option<DynamicEncoderParams> {
